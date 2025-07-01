@@ -21,12 +21,7 @@ services:
     build: .
     restart: always
     env_file: .env
-    environment:
-      - WARP_ENABLED=true
-      - WARP_HOST=warp-proxy
-      - WARP_PORT=1080
-      - DISABLE_INTERNAL_SSL=true
-      - DOMAIN=vpn.equiply.ru
+    
     ports:
       - "1080:1080"
       - "2053:2053"
@@ -48,20 +43,20 @@ services:
       - marzban_configs:/app/configs
       - marzban_logs:/var/log/xray
       - /opt/marzban:/opt/marzban
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=dokploy-network"
+    #labels:
+      #- "traefik.enable=true"
+      #- "traefik.docker.network=dokploy-network"
       # HTTP редирект на HTTPS
-      - "traefik.http.routers.marzban-http.rule=Host(`vpn.equiply.ru`)"
-      - "traefik.http.routers.marzban-http.entrypoints=web"
-      - "traefik.http.routers.marzban-http.middlewares=redirect-to-https@file"
+      #- "traefik.http.routers.marzban-http.rule=Host(`vpn.equiply.ru`)"
+      #- "traefik.http.routers.marzban-http.entrypoints=web"
+      #- "traefik.http.routers.marzban-http.middlewares=redirect-to-https@file"
       # HTTPS маршрут с Let's Encrypt
-      - "traefik.http.routers.marzban-https.rule=Host(`vpn.equiply.ru`)"
-      - "traefik.http.routers.marzban-https.entrypoints=websecure"
-      - "traefik.http.routers.marzban-https.tls.certresolver=letsencrypt"
+      #- "traefik.http.routers.marzban-https.rule=Host(`vpn.equiply.ru`)"
+      #- "traefik.http.routers.marzban-https.entrypoints=websecure"
+      #- "traefik.http.routers.marzban-https.tls.certresolver=letsencrypt"
       # Основной сервис для панели (порт 8003)
-      - "traefik.http.services.marzban-web.loadbalancer.server.port=8003"
-      - "traefik.http.routers.marzban-https.service=marzban-web"
+      #- "traefik.http.services.marzban-web.loadbalancer.server.port=8003"
+      #- "traefik.http.routers.marzban-https.service=marzban-web"
     depends_on:
       mysql:
         condition: service_healthy
