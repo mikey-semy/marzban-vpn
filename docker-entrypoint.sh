@@ -55,15 +55,10 @@ init_xray_config() {
 
 # Генерация SSL сертификатов
 generate_ssl_certs() {
-    # Проверяем нужно ли генерировать сертификаты
-    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ] && [ "${FORCE_DUMMY_CERTS:-false}" != "true" ]; then
+    # Пропускаем генерацию SSL если отключен внутренний SSL
+    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
         log "Пропуск генерации SSL сертификатов (SSL обрабатывается Traefik)"
         return 0
-    fi
-    
-    # Если нужны фиктивные сертификаты для обхода проверки
-    if [ "${FORCE_DUMMY_CERTS:-false}" = "true" ]; then
-        log "Создание фиктивных SSL сертификатов для обхода проверки Marzban"
     fi
 
     log "Проверка SSL сертификатов..."
@@ -151,12 +146,17 @@ setup_defaults() {
     # Настройка SSL в зависимости от режима
     if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
         log "SSL отключен внутри контейнера (обрабатывается Traefik/Cloudflare)"
+        # Полностью удаляем SSL переменные из окружения
+        unset UVICORN_SSL_CERTFILE
+        unset UVICORN_SSL_KEYFILE  
+        unset UVICORN_SSL_CA_TYPE
+        # Принудительно слушаем все интерфейсы для работы с reverse proxy
+        export UVICORN_HOST="0.0.0.0"
+        
+        # Дополнительно убеждаемся что переменные пустые
         export UVICORN_SSL_CERTFILE=""
         export UVICORN_SSL_KEYFILE=""
         export UVICORN_SSL_CA_TYPE=""
-        # Принудительно слушаем все интерфейсы для работы с reverse proxy
-        export UVICORN_HOST="0.0.0.0"
-        export MARZBAN_BYPASS_SSL_CHECK="true"
     elif [ "${USE_LETSENCRYPT_CERTS:-false}" = "true" ]; then
         log "Используются Let's Encrypt сертификаты"
         export UVICORN_SSL_CERTFILE="${LETSENCRYPT_CERT_PATH:-/etc/letsencrypt/live/${DOMAIN}/fullchain.pem}"
