@@ -1,0 +1,167 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "BLOCK",
+        "type": "field"
+      },
+      {
+        "type": "field",
+        "outboundTag": "warp",
+        "domain": [
+          "geosite:openai",
+          "geosite:google", 
+          "geosite:youtube",
+          "geosite:netflix",
+          "geosite:instagram",
+          "geosite:facebook",
+          "geosite:twitter"
+        ]
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "VMess TCP",
+      "listen": "0.0.0.0",
+      "port": 2053,
+      "protocol": "vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "tcp"
+      }
+    },
+    {
+      "tag": "VMess WS",
+      "listen": "0.0.0.0",
+      "port": 2083,
+      "protocol": "vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/vmess"
+        }
+      }
+    },
+    {
+      "tag": "VLESS TCP",
+      "listen": "0.0.0.0",
+      "port": 2054,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp"
+      }
+    },
+    {
+      "tag": "VLESS WS",
+      "listen": "0.0.0.0",
+      "port": 2084,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/vless"
+        }
+      }
+    },
+    {
+      "tag": "VLESS Reality",
+      "listen": "0.0.0.0", 
+      "port": 2443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "dest": "ya.ru:443",
+          "serverNames": ["ya.ru", "www.ya.ru"],
+          "privateKey": "KGk81gobUw_93qYY6_cALOKa26VZFL8DCHhtEeb3eEo",
+          "publicKey": "RNc4Mz5c3zPvbeLVWTdlSY0t034ZVDg1IN0KMIPTqkA",
+          "shortIds": [""]
+        }
+      }
+    },
+    {
+      "tag": "Trojan TCP",
+      "listen": "0.0.0.0",
+      "port": 2055,
+      "protocol": "trojan",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "tcp"
+      }
+    },
+    {
+      "tag": "Trojan WS",
+      "listen": "0.0.0.0",
+      "port": 2085,
+      "protocol": "trojan",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/trojan"
+        }
+      }
+    },
+    {
+      "tag": "Shadowsocks TCP",
+      "listen": "0.0.0.0",
+      "port": 1080,
+      "protocol": "shadowsocks",
+      "settings": {
+        "method": "chacha20-ietf-poly1305",
+        "clients": []
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "DIRECT"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "BLOCK"
+    },
+    {
+      "tag": "warp",
+      "protocol": "socks",
+      "settings": {
+        "servers": [
+          {
+            "address": "127.0.0.1",
+            "port": 41080
+          }
+        ]
+      }
+    }
+  ]
+}
