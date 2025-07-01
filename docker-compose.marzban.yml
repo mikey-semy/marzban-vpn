@@ -5,7 +5,7 @@ services:
     environment:
       MYSQL_DATABASE: marzban-db
       MYSQL_USER: marzban
-      MYSQL_PASSWORD: 36nuw6tupp3efdeb
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
