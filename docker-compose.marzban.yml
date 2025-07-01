@@ -1,21 +1,21 @@
 services:
-  # mysql:
-  #   image: mysql:8.0
-  #   restart: always
-  #   environment:
-  #     MYSQL_DATABASE: marzban
-  #     MYSQL_USER: marzban
-  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
-  #   command: --default-authentication-plugin=mysql_native_password
-  #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-  #     timeout: 20s
-  #     retries: 10
-  #   networks:
-  #     - dokploy-network
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: marzban-db
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD: 36nuw6tupp3efdeb
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - dokploy-network
 
   marzban:
     build: .
@@ -57,13 +57,13 @@ services:
       # Основной сервис для панели (порт 8003)
       - "traefik.http.services.marzban-web.loadbalancer.server.port=8003"
       - "traefik.http.routers.marzban-https.service=marzban-web"
-    # depends_on:
-    #   mysql:
-    #     condition: service_healthy
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - dokploy-network
 volumes:
-  # mysql_data:
+  mysql_data:
   marzban_data:
   marzban_configs:
   marzban_logs:
