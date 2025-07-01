@@ -18,9 +18,13 @@ services:
       - dokploy-network
 
   marzban:
-    image: gozargah/marzban:latest
+    build: .
     restart: always
     env_file: .env
+    environment:
+      - WARP_ENABLED=true
+      - WARP_HOST=warp-proxy
+      - WARP_PORT=1080
     ports:
       - "8003:8003"
       - "1080:1080"
@@ -31,13 +35,10 @@ services:
       - "2084:2084"
       - "2085:2085"
       - "2443:2443"
-    command: >
-      bash -c "
-      openssl req -x509 -newkey rsa:2048 -keyout /tmp/cert.key -out /tmp/cert.crt -days 1 -nodes -subj '/CN=localhost' &&
-      python main.py
-      "
     volumes:
-      - /var/lib/marzban:/var/lib/marzban
+      - marzban_data:/var/lib/marzban
+      - marzban_configs:/app/configs
+      - marzban_logs:/var/log/xray
       - /opt/marzban:/opt/marzban
     depends_on:
       mysql:
@@ -46,6 +47,9 @@ services:
       - dokploy-network
 volumes:
   mysql_data:
+  marzban_data:
+  marzban_configs:
+  marzban_logs:
 
 networks:
   dokploy-network:
