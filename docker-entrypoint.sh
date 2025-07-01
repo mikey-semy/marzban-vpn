@@ -55,23 +55,37 @@ init_xray_config() {
 
 # Генерация SSL сертификатов
 generate_ssl_certs() {
-    log "Проверка SSL сертификатов..."
+log "Проверка SSL сертификатов..."
 
-    CERT_FILE="${UVICORN_SSL_CERTFILE:-/tmp/cert.crt}"
-    KEY_FILE="${UVICORN_SSL_KEYFILE:-/tmp/cert.key}"
+CERT_FILE="${UVICORN_SSL_CERTFILE:-/var/lib/marzban/cert.crt}"
+KEY_FILE="${UVICORN_SSL_KEYFILE:-/var/lib/marzban/cert.key}"
 
-    if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
-        log "Генерация самоподписанного SSL сертификата..."
-        openssl req -x509 -newkey rsa:2048 \
-            -keyout "$KEY_FILE" \
-            -out "$CERT_FILE" \
-            -days 365 \
-            -nodes \
-            -subj "/CN=${DOMAIN:-localhost}"
+if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+log "Генерация самоподписанного SSL сертификата..."
+openssl req -x509 -newkey rsa:2048 \
+-keyout "$KEY_FILE" \
+-out "$CERT_FILE" \
+-days 365 \
+-nodes \
+-subj "/CN=${DOMAIN:-localhost}"
+
+    # Устанавливаем права для пользователя marzban
+chown marzban:marzban "$CERT_FILE" "$KEY_FILE"
+    chmod 644 "$CERT_FILE"
+        chmod 600 "$KEY_FILE"
+        
         log_success "SSL сертификаты созданы"
     else
+        # Проверяем и исправляем права если сертификаты уже существуют
+        chown marzban:marzban "$CERT_FILE" "$KEY_FILE" 2>/dev/null || true
+        chmod 644 "$CERT_FILE" 2>/dev/null || true
+        chmod 600 "$KEY_FILE" 2>/dev/null || true
         log_success "SSL сертификаты уже существуют"
     fi
+    
+    # Экспортируем пути для использования в приложении
+    export UVICORN_SSL_CERTFILE="$CERT_FILE"
+    export UVICORN_SSL_KEYFILE="$KEY_FILE"
 }
 
 # Создание директорий для логов
@@ -118,10 +132,18 @@ setup_defaults() {
 
     # Установка значений по умолчанию
     export UVICORN_HOST="${UVICORN_HOST:-0.0.0.0}"
-    export UVICORN_PORT="${UVICORN_PORT:-8000}"
+    export UVICORN_PORT="${UVICORN_PORT:-8003}"
     export XRAY_JSON="${XRAY_JSON:-/var/lib/marzban/xray_config.json}"
     export XRAY_EXECUTABLE_PATH="${XRAY_EXECUTABLE_PATH:-/usr/local/bin/xray}"
     export XRAY_ASSETS_PATH="${XRAY_ASSETS_PATH:-/usr/local/share/xray}"
+
+    # Отключаем SSL внутри контейнера, так как Traefik обрабатывает SSL
+    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
+        log "SSL отключен внутри контейнера (обрабатывается Traefik)"
+        unset UVICORN_SSL_CERTFILE
+        unset UVICORN_SSL_KEYFILE
+        unset UVICORN_SSL_CA_TYPE
+    fi
 
     log_success "Переменные окружения настроены"
 }

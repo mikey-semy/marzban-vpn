@@ -25,6 +25,7 @@ services:
       - WARP_ENABLED=true
       - WARP_HOST=warp-proxy
       - WARP_PORT=1080
+      - DISABLE_INTERNAL_SSL=true
     ports:
       - "1080:1080"
       - "2053:2053"
