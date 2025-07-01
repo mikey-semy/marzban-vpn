@@ -55,10 +55,15 @@ init_xray_config() {
 
 # Генерация SSL сертификатов
 generate_ssl_certs() {
-    # Пропускаем генерацию SSL если отключен внутренний SSL
-    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
+    # Проверяем нужно ли генерировать сертификаты
+    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ] && [ "${FORCE_DUMMY_CERTS:-false}" != "true" ]; then
         log "Пропуск генерации SSL сертификатов (SSL обрабатывается Traefik)"
         return 0
+    fi
+    
+    # Если нужны фиктивные сертификаты для обхода проверки
+    if [ "${FORCE_DUMMY_CERTS:-false}" = "true" ]; then
+        log "Создание фиктивных SSL сертификатов для обхода проверки Marzban"
     fi
 
     log "Проверка SSL сертификатов..."
@@ -149,6 +154,9 @@ setup_defaults() {
         export UVICORN_SSL_CERTFILE=""
         export UVICORN_SSL_KEYFILE=""
         export UVICORN_SSL_CA_TYPE=""
+        # Принудительно слушаем все интерфейсы для работы с reverse proxy
+        export UVICORN_HOST="0.0.0.0"
+        export MARZBAN_BYPASS_SSL_CHECK="true"
     elif [ "${USE_LETSENCRYPT_CERTS:-false}" = "true" ]; then
         log "Используются Let's Encrypt сертификаты"
         export UVICORN_SSL_CERTFILE="${LETSENCRYPT_CERT_PATH:-/etc/letsencrypt/live/${DOMAIN}/fullchain.pem}"

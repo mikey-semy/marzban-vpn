@@ -26,6 +26,7 @@ services:
       - WARP_HOST=warp-proxy
       - WARP_PORT=1080
       - DISABLE_INTERNAL_SSL=true
+      - FORCE_DUMMY_CERTS=true
       - DOMAIN=vpn.equiply.ru
     ports:
       - "1080:1080"
