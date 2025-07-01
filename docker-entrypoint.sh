@@ -55,23 +55,29 @@ init_xray_config() {
 
 # Генерация SSL сертификатов
 generate_ssl_certs() {
-log "Проверка SSL сертификатов..."
+    # Пропускаем генерацию SSL если отключен внутренний SSL
+    if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
+        log "Пропуск генерации SSL сертификатов (SSL обрабатывается Traefik)"
+        return 0
+    fi
 
-CERT_FILE="${UVICORN_SSL_CERTFILE:-/var/lib/marzban/cert.crt}"
-KEY_FILE="${UVICORN_SSL_KEYFILE:-/var/lib/marzban/cert.key}"
+    log "Проверка SSL сертификатов..."
 
-if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
-log "Генерация самоподписанного SSL сертификата..."
-openssl req -x509 -newkey rsa:2048 \
--keyout "$KEY_FILE" \
--out "$CERT_FILE" \
--days 365 \
--nodes \
--subj "/CN=${DOMAIN:-localhost}"
+    CERT_FILE="${UVICORN_SSL_CERTFILE:-/var/lib/marzban/cert.crt}"
+    KEY_FILE="${UVICORN_SSL_KEYFILE:-/var/lib/marzban/cert.key}"
 
-    # Устанавливаем права для пользователя marzban
-chown marzban:marzban "$CERT_FILE" "$KEY_FILE"
-    chmod 644 "$CERT_FILE"
+    if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+        log "Генерация самоподписанного SSL сертификата..."
+        openssl req -x509 -newkey rsa:2048 \
+            -keyout "$KEY_FILE" \
+            -out "$CERT_FILE" \
+            -days 365 \
+            -nodes \
+            -subj "/CN=${DOMAIN:-localhost}"
+
+        # Устанавливаем права для пользователя marzban
+        chown marzban:marzban "$CERT_FILE" "$KEY_FILE"
+        chmod 644 "$CERT_FILE"
         chmod 600 "$KEY_FILE"
         
         log_success "SSL сертификаты созданы"
@@ -137,12 +143,17 @@ setup_defaults() {
     export XRAY_EXECUTABLE_PATH="${XRAY_EXECUTABLE_PATH:-/usr/local/bin/xray}"
     export XRAY_ASSETS_PATH="${XRAY_ASSETS_PATH:-/usr/local/share/xray}"
 
-    # Отключаем SSL внутри контейнера, так как Traefik обрабатывает SSL
+    # Настройка SSL в зависимости от режима
     if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
-        log "SSL отключен внутри контейнера (обрабатывается Traefik)"
-        unset UVICORN_SSL_CERTFILE
-        unset UVICORN_SSL_KEYFILE
-        unset UVICORN_SSL_CA_TYPE
+        log "SSL отключен внутри контейнера (обрабатывается Traefik/Cloudflare)"
+        export UVICORN_SSL_CERTFILE=""
+        export UVICORN_SSL_KEYFILE=""
+        export UVICORN_SSL_CA_TYPE=""
+    elif [ "${USE_LETSENCRYPT_CERTS:-false}" = "true" ]; then
+        log "Используются Let's Encrypt сертификаты"
+        export UVICORN_SSL_CERTFILE="${LETSENCRYPT_CERT_PATH:-/etc/letsencrypt/live/${DOMAIN}/fullchain.pem}"
+        export UVICORN_SSL_KEYFILE="${LETSENCRYPT_KEY_PATH:-/etc/letsencrypt/live/${DOMAIN}/privkey.pem}"
+        export UVICORN_SSL_CA_TYPE="public"
     fi
 
     log_success "Переменные окружения настроены"

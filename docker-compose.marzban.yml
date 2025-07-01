@@ -26,6 +26,7 @@ services:
       - WARP_HOST=warp-proxy
       - WARP_PORT=1080
       - DISABLE_INTERNAL_SSL=true
+      - DOMAIN=vpn.equiply.ru
     ports:
       - "1080:1080"
       - "2053:2053"
@@ -49,7 +50,7 @@ services:
       - "traefik.http.routers.marzban-http.rule=Host(`vpn.equiply.ru`)"
       - "traefik.http.routers.marzban-http.entrypoints=web"
       - "traefik.http.routers.marzban-http.middlewares=redirect-to-https@file"
-      # HTTPS маршрут
+      # HTTPS маршрут с Let's Encrypt
       - "traefik.http.routers.marzban-https.rule=Host(`vpn.equiply.ru`)"
       - "traefik.http.routers.marzban-https.entrypoints=websecure"
       - "traefik.http.routers.marzban-https.tls.certresolver=letsencrypt"

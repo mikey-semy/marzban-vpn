@@ -71,15 +71,24 @@ XRAY_JSON=/var/lib/marzban/xray_config.json
 XRAY_SUBSCRIPTION_URL_PREFIX=https://vpn.yourdomain.com
 ```
 
-### 5. Настройка домена
+### 5. Настройка домена и SSL
 
-1. **В настройках проекта Marzban**:
-   - Добавьте домен: `vpn.yourdomain.com`
-   - Включите SSL: `Let's Encrypt`
-   - Dokploy автоматически настроит Traefik
-
-2. **DNS настройки**:
+1. **DNS настройки** (сначала!):
    - Добавьте A-запись: `vpn.yourdomain.com` → `IP_вашего_сервера`
+   - Дождитесь распространения DNS (можно проверить: `nslookup vpn.yourdomain.com`)
+
+2. **В настройках проекта Marzban в Dokploy**:
+   - Перейдите в раздел "Domains"
+   - Добавьте домен: `vpn.yourdomain.com`
+   - Включите "Generate SSL Certificate"
+   - Выберите "Let's Encrypt"
+   - Dokploy автоматически получит и настроит сертификат
+
+3. **Альтернатива - Cloudflare SSL**:
+   - Добавьте домен в Cloudflare
+   - Включите "Proxy" (оранжевое облако)
+   - В Cloudflare SSL/TLS → "Full (strict)"
+   - В Dokploy отключите Let's Encrypt
 
 ### 6. Запуск WARP прокси
 
