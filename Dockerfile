@@ -5,8 +5,12 @@ USER root
 RUN apt-get update && apt-get install -y \
     curl \
     jq \
-    su-exec \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Установка su-exec вручную
+RUN wget -O /usr/local/bin/su-exec https://github.com/ncopa/su-exec/releases/download/v0.2/su-exec.static.x86_64 \
+    && chmod +x /usr/local/bin/su-exec
 
 # Создание пользователя marzban если не существует
 RUN id -u marzban >/dev/null 2>&1 || useradd -r -s /bin/false marzban
