@@ -175,7 +175,7 @@ log "=== Запуск Marzban VPN с персистентной конфигур
     
     # Выполнение команды от имени пользователя marzban
     if id -u marzban >/dev/null 2>&1; then
-        exec su-exec marzban "$@"
+        exec gosu marzban "$@"
     else
         log_warning "Пользователь marzban не найден, запуск от root"
         exec "$@"
