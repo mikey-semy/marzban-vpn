@@ -179,6 +179,24 @@ update_warp_config() {
     fi
 }
 
+# Выполнение миграций базы данных
+run_database_migrations() {
+    log "Выполнение миграций базы данных..."
+    
+    # Проверяем доступность alembic
+    if command -v alembic >/dev/null 2>&1; then
+        # Выполняем миграции
+        alembic upgrade head
+        if [ $? -eq 0 ]; then
+            log_success "Миграции базы данных выполнены успешно"
+        else
+            log_warning "Ошибка при выполнении миграций, продолжаем..."
+        fi
+    else
+        log_warning "Alembic не найден, пропускаем миграции"
+    fi
+}
+
 # Переключение на пользователя marzban для запуска приложения
 switch_to_marzban() {
 log "Настройка прав доступа..."
@@ -202,6 +220,7 @@ log "=== Запуск Marzban VPN с персистентной конфигур
     init_xray_config
     update_warp_config "$XRAY_JSON"
     check_database
+    run_database_migrations
     switch_to_marzban
     
     log_success "=== Инициализация завершена, запуск приложения ==="
