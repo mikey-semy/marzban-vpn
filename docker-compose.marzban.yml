@@ -1,21 +1,21 @@
 services:
-  mysql:
-    image: mysql:8.0
-    restart: always
-    environment:
-      MYSQL_DATABASE: marzban
-      MYSQL_USER: marzban
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
-    networks:
-      - dokploy-network
+  # mysql:
+  #   image: mysql:8.0
+  #   restart: always
+  #   environment:
+  #     MYSQL_DATABASE: marzban
+  #     MYSQL_USER: marzban
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   command: --default-authentication-plugin=mysql_native_password
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     timeout: 20s
+  #     retries: 10
+  #   networks:
+  #     - dokploy-network
 
   marzban:
     build: .
@@ -26,7 +26,6 @@ services:
       - WARP_HOST=warp-proxy
       - WARP_PORT=1080
     ports:
-      - "8003:8003"
       - "1080:1080"
       - "2053:2053"
       - "2054:2054"
@@ -35,18 +34,34 @@ services:
       - "2084:2084"
       - "2085:2085"
       - "2443:2443"
+    expose:
+      - "8003"
     volumes:
       - marzban_data:/var/lib/marzban
       - marzban_configs:/app/configs
       - marzban_logs:/var/log/xray
       - /opt/marzban:/opt/marzban
-    depends_on:
-      mysql:
-        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      # HTTP редирект на HTTPS
+      - "traefik.http.routers.marzban-http.rule=Host(`vpn.equiply.ru`)"
+      - "traefik.http.routers.marzban-http.entrypoints=web"
+      - "traefik.http.routers.marzban-http.middlewares=redirect-to-https@file"
+      # HTTPS маршрут
+      - "traefik.http.routers.marzban-https.rule=Host(`vpn.equiply.ru`)"
+      - "traefik.http.routers.marzban-https.entrypoints=websecure"
+      - "traefik.http.routers.marzban-https.tls.certresolver=letsencrypt"
+      # Основной сервис для панели (порт 8003)
+      - "traefik.http.services.marzban-web.loadbalancer.server.port=8003"
+      - "traefik.http.routers.marzban-https.service=marzban-web"
+    # depends_on:
+    #   mysql:
+    #     condition: service_healthy
     networks:
       - dokploy-network
 volumes:
-  mysql_data:
+  # mysql_data:
   marzban_data:
   marzban_configs:
   marzban_logs:

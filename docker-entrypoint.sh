@@ -146,9 +146,21 @@ update_warp_config() {
     fi
 }
 
+# Переключение на пользователя marzban для запуска приложения
+switch_to_marzban() {
+log "Настройка прав доступа..."
+
+# Устанавливаем права на директории
+chown -R marzban:marzban /var/lib/marzban 2>/dev/null || true
+chown -R marzban:marzban /app/configs 2>/dev/null || true
+chown -R marzban:marzban /var/log/xray 2>/dev/null || true
+
+log_success "Права установлены для пользователя marzban"
+}
+
 # Основная функция инициализации
 main() {
-    log "=== Запуск Marzban VPN с персистентной конфигурацией ==="
+log "=== Запуск Marzban VPN с персистентной конфигурацией ==="
 
     # Выполнение всех этапов инициализации
     setup_defaults
@@ -157,11 +169,17 @@ main() {
     init_xray_config
     update_warp_config "$XRAY_JSON"
     check_database
-
+    switch_to_marzban
+    
     log_success "=== Инициализация завершена, запуск приложения ==="
-
-    # Выполнение команды, переданной в контейнер
-    exec "$@"
+    
+    # Выполнение команды от имени пользователя marzban
+    if id -u marzban >/dev/null 2>&1; then
+        exec su-exec marzban "$@"
+    else
+        log_warning "Пользователь marzban не найден, запуск от root"
+        exec "$@"
+    fi
 }
 
 # Запуск основной функции

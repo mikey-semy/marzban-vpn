@@ -278,5 +278,7 @@ marzban-vpn/
 ├── docker-compose.warp.yml      # WARP прокси
 ├── config.json                  # Шаблон конфигурации Xray
 ├── .env.example                 # Пример переменных окружения
+├── LICENSE                      # Лицензия
+├── DOKPLOY-SETUP.md             # Инструкция по настройке в Dokploy
 └── README.md                    # Документация
 ```
