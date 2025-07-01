@@ -1,0 +1,52 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: marzban
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - dokploy-network
+
+  marzban:
+    image: gozargah/marzban:latest
+    restart: always
+    env_file: .env
+    ports:
+      - "8003:8003"
+      - "1080:1080"
+      - "2053:2053"
+      - "2054:2054"
+      - "2055:2055"
+      - "2083:2083"
+      - "2084:2084"
+      - "2085:2085"
+      - "2443:2443"
+    command: >
+      bash -c "
+      openssl req -x509 -newkey rsa:2048 -keyout /tmp/cert.key -out /tmp/cert.crt -days 1 -nodes -subj '/CN=localhost' &&
+      python main.py
+      "
+    volumes:
+      - /var/lib/marzban:/var/lib/marzban
+      - /opt/marzban:/opt/marzban
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - dokploy-network
+volumes:
+  mysql_data:
+
+networks:
+  dokploy-network:
+    external: true
