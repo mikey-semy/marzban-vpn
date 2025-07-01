@@ -1,0 +1,22 @@
+services:
+  warp:
+    image: caomingjun/warp
+    container_name: warp-proxy
+    restart: unless-stopped
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "41080:1080"  # SOCKS5 прокси
+    networks:
+      - warp-net
+
+networks:
+  warp-net:
+    driver: bridge

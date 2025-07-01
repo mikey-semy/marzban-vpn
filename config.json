@@ -15,13 +15,17 @@
         "type": "field",
         "outboundTag": "warp",
         "domain": [
-          "geosite:openai",
-          "geosite:google", 
-          "geosite:youtube",
-          "geosite:netflix",
-          "geosite:instagram",
-          "geosite:facebook",
-          "geosite:twitter"
+            "geosite:openai",
+            "geosite:google",
+            "geosite:youtube",
+            "geosite:netflix",
+            "geosite:instagram",
+            "geosite:facebook",
+            "geosite:twitter",
+            "geosite:discord",
+            "geosite:telegram",
+            "geosite:spotify",
+            "geosite:tiktok"
         ]
       }
     ]
@@ -85,7 +89,7 @@
     },
     {
       "tag": "VLESS Reality",
-      "listen": "0.0.0.0", 
+      "listen": "0.0.0.0",
       "port": 2443,
       "protocol": "vless",
       "settings": {

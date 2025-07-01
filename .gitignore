@@ -1,0 +1,31 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Docker volumes
+mysql_data/
+marzban_data/
+
+# Logs
+*.log
+logs/
+
+# SSL certificates
+*.crt
+*.key
+*.pem
+
+# Backup files
+*.sql
+backup/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
