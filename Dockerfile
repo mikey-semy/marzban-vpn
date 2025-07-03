@@ -27,6 +27,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY config.json /app/configs/config.json.template
 RUN chown marzban:marzban /app/configs/config.json.template
 
+EXPOSE 8003
 # Настройка томов для персистентного хранения
 VOLUME ["/var/lib/marzban", "/app/configs", "/var/log/xray"]
 
