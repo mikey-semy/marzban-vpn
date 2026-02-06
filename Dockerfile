@@ -1,4 +1,6 @@
-FROM gozargah/marzban:latest
+# Версия Marzban (можно переопределить при сборке: docker build --build-arg MARZBAN_VERSION=v0.8.4)
+ARG MARZBAN_VERSION=v0.8.4
+FROM gozargah/marzban:${MARZBAN_VERSION}
 
 # Установка необходимых пакетов
 USER root

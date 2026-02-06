@@ -2,14 +2,16 @@
 .git
 .gitignore
 
-# Documentation
+# Documentation (не нужна в образе)
 README.md
+docs/
 *.md
+!config.json
 
-# Environment files
+# Environment files (секреты не должны попадать в образ)
 .env
 .env.local
-.env.example
+.env.production
 
 # Logs
 *.log
@@ -32,17 +34,15 @@ temp/
 
 # OS generated files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Docker
-docker-compose*.yml
-Dockerfile*
 
 # Backup files
 *.backup
 *.bak
+*.sql
+
+# Docker compose files (не нужны внутри образа)
+docker-compose*.yml
+
+# Init scripts (используется только для ручной настройки)
+init-mysql.sql

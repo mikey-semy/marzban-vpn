@@ -161,8 +161,8 @@
       "settings": {
         "servers": [
           {
-            "address": "127.0.0.1",
-            "port": 41080
+            "address": "warp-proxy",
+            "port": 1080
           }
         ]
       }

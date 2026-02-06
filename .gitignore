@@ -18,6 +18,7 @@ logs/
 
 # Backup files
 *.sql
+!init-mysql.sql
 backup/
 
 # OS files

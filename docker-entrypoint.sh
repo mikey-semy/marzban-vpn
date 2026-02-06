@@ -65,30 +65,53 @@ generate_ssl_certs() {
 
     CERT_FILE="${UVICORN_SSL_CERTFILE:-/var/lib/marzban/cert.crt}"
     KEY_FILE="${UVICORN_SSL_KEYFILE:-/var/lib/marzban/cert.key}"
+    CERT_DAYS="${SSL_CERT_DAYS:-365}"
+
+    # Проверка существования сертификатов и их валидности
+    local need_regenerate=false
 
     if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
-        log "Генерация самоподписанного SSL сертификата..."
-        openssl req -x509 -newkey rsa:2048 \
+        need_regenerate=true
+        log "Сертификаты не найдены, требуется генерация"
+    elif ! openssl x509 -checkend 86400 -noout -in "$CERT_FILE" 2>/dev/null; then
+        need_regenerate=true
+        log_warning "Сертификат истекает в течение 24 часов, требуется обновление"
+    fi
+
+    if [ "$need_regenerate" = true ]; then
+        log "Генерация самоподписанного SSL сертификата (срок: $CERT_DAYS дней)..."
+
+        # Создаем директорию если не существует
+        mkdir -p "$(dirname "$CERT_FILE")"
+
+        if openssl req -x509 -newkey rsa:2048 \
             -keyout "$KEY_FILE" \
             -out "$CERT_FILE" \
-            -days 365 \
+            -days "$CERT_DAYS" \
             -nodes \
-            -subj "/CN=${DOMAIN:-localhost}"
+            -subj "/CN=${DOMAIN:-localhost}" 2>/dev/null; then
 
-        # Устанавливаем права для пользователя marzban
-        chown marzban:marzban "$CERT_FILE" "$KEY_FILE"
-        chmod 644 "$CERT_FILE"
-        chmod 600 "$KEY_FILE"
-        
-        log_success "SSL сертификаты созданы"
+            # Устанавливаем права для пользователя marzban
+            chown marzban:marzban "$CERT_FILE" "$KEY_FILE" 2>/dev/null || true
+            chmod 644 "$CERT_FILE"
+            chmod 600 "$KEY_FILE"
+
+            log_success "SSL сертификаты созданы"
+        else
+            log_error "Ошибка при генерации SSL сертификатов"
+            return 1
+        fi
     else
         # Проверяем и исправляем права если сертификаты уже существуют
         chown marzban:marzban "$CERT_FILE" "$KEY_FILE" 2>/dev/null || true
         chmod 644 "$CERT_FILE" 2>/dev/null || true
         chmod 600 "$KEY_FILE" 2>/dev/null || true
-        log_success "SSL сертификаты уже существуют"
+
+        # Показываем информацию о сертификате
+        local expiry_date=$(openssl x509 -enddate -noout -in "$CERT_FILE" 2>/dev/null | cut -d= -f2)
+        log_success "SSL сертификаты актуальны (истекает: $expiry_date)"
     fi
-    
+
     # Экспортируем пути для использования в приложении
     export UVICORN_SSL_CERTFILE="$CERT_FILE"
     export UVICORN_SSL_KEYFILE="$KEY_FILE"
@@ -109,26 +132,43 @@ check_database() {
     # Ожидание доступности базы данных
     if [ -n "$SQLALCHEMY_DATABASE_URL" ]; then
         # Парсинг URL базы данных для получения хоста и порта
-        DB_HOST=$(echo "$SQLALCHEMY_DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-        DB_PORT=$(echo "$SQLALCHEMY_DATABASE_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+        # Поддерживает форматы: mysql+pymysql://user:pass@host:port/db
+        DB_HOST=$(echo "$SQLALCHEMY_DATABASE_URL" | sed -E 's/.*@([^:\/]+)(:[0-9]+)?.*/\1/')
+        DB_PORT=$(echo "$SQLALCHEMY_DATABASE_URL" | sed -E 's/.*:([0-9]+)\/.*/\1/')
 
-        if [ -n "$DB_HOST" ] && [ -n "$DB_PORT" ]; then
+        # Валидация распарсенных значений
+        if [ -z "$DB_PORT" ] || ! [[ "$DB_PORT" =~ ^[0-9]+$ ]]; then
+            DB_PORT="3306"
+            log_warning "Порт БД не определен, используется по умолчанию: $DB_PORT"
+        fi
+
+        if [ -n "$DB_HOST" ] && [ "$DB_HOST" != "$SQLALCHEMY_DATABASE_URL" ]; then
             log "Ожидание доступности базы данных $DB_HOST:$DB_PORT..."
 
-            # Простая проверка доступности порта
-            for i in {1..30}; do
+            # Конфигурируемое количество попыток
+            local max_retries="${DB_WAIT_RETRIES:-30}"
+            local retry_delay=2
+
+            for i in $(seq 1 $max_retries); do
                 if timeout 1 bash -c "echo >/dev/tcp/$DB_HOST/$DB_PORT" 2>/dev/null; then
-                    log_success "База данных доступна"
-                    break
+                    log_success "База данных доступна после $i попыток"
+                    return 0
                 fi
 
-                if [ $i -eq 30 ]; then
-                    log_warning "Не удалось подключиться к базе данных, продолжаем..."
+                if [ $i -eq $max_retries ]; then
+                    log_warning "Не удалось подключиться к базе данных после $max_retries попыток"
+                    log_warning "Продолжаем запуск, приложение попробует подключиться позже..."
+                    return 1
                 else
-                    sleep 2
+                    log "Попытка $i/$max_retries - ожидание ${retry_delay}с..."
+                    sleep $retry_delay
                 fi
             done
+        else
+            log_warning "Не удалось определить хост БД из URL"
         fi
+    else
+        log_warning "SQLALCHEMY_DATABASE_URL не задан"
     fi
 }
 
@@ -187,6 +227,40 @@ update_warp_config() {
     fi
 }
 
+# Обновление Reality ключей в Xray конфигурации
+update_reality_config() {
+    local xray_config="$1"
+
+    # Проверяем наличие Reality переменных
+    if [ -n "$REALITY_PRIVATE_KEY" ] && [ -n "$REALITY_PUBLIC_KEY" ]; then
+        log "Обновление Reality ключей..."
+
+        REALITY_DEST="${REALITY_DEST:-ya.ru:443}"
+        REALITY_SERVER_NAMES="${REALITY_SERVER_NAMES:-ya.ru,www.ya.ru}"
+
+        # Конвертируем строку server names в JSON массив
+        SERVER_NAMES_JSON=$(echo "$REALITY_SERVER_NAMES" | tr ',' '\n' | jq -R . | jq -s .)
+
+        # Обновляем конфигурацию
+        jq --arg privKey "$REALITY_PRIVATE_KEY" \
+           --arg pubKey "$REALITY_PUBLIC_KEY" \
+           --arg dest "$REALITY_DEST" \
+           --argjson serverNames "$SERVER_NAMES_JSON" \
+           '.inbounds |= map(if .tag == "VLESS Reality" then
+               .streamSettings.realitySettings.privateKey = $privKey |
+               .streamSettings.realitySettings.publicKey = $pubKey |
+               .streamSettings.realitySettings.dest = $dest |
+               .streamSettings.realitySettings.serverNames = $serverNames
+           else . end)' \
+           "$xray_config" > "${xray_config}.tmp" && mv "${xray_config}.tmp" "$xray_config"
+
+        log_success "Reality ключи обновлены"
+    else
+        log_warning "Reality ключи не заданы, используются значения из шаблона"
+        log_warning "Рекомендуется сгенерировать уникальные ключи командой: xray x25519"
+    fi
+}
+
 # Выполнение миграций базы данных
 run_database_migrations() {
     log "Выполнение миграций базы данных..."
@@ -227,6 +301,7 @@ log "=== Запуск Marzban VPN с персистентной конфигур
     generate_ssl_certs
     init_xray_config
     update_warp_config "$XRAY_JSON"
+    update_reality_config "$XRAY_JSON"
     check_database
     run_database_migrations
     switch_to_marzban

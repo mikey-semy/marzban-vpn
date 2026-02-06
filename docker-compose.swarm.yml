@@ -1,0 +1,247 @@
+# Docker Swarm Stack для Marzban VPN
+# Развертывание: docker stack deploy -c docker-compose.swarm.yml marzban
+#
+# Подготовка:
+# 1. Инициализация swarm: docker swarm init
+# 2. Создание сети: docker network create --driver overlay --attachable marzban-network
+# 3. Создание secrets:
+#    echo "your_password" | docker secret create mysql_password -
+#    echo "your_root_password" | docker secret create mysql_root_password -
+#    echo "your_admin_password" | docker secret create marzban_admin_password -
+#    echo "your_telegram_token" | docker secret create telegram_token -
+# 4. Создание config:
+#    docker config create xray_config config.json
+
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+    environment:
+      MYSQL_DATABASE: marzban-db
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets:
+      - mysql_password
+      - mysql_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - marzban-network
+
+  marzban:
+    image: ${MARZBAN_IMAGE:-marzban-vpn:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: stop-first
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=marzban-network"
+        # HTTP -> HTTPS редирект
+        - "traefik.http.routers.marzban-http.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.marzban-http.entrypoints=web"
+        - "traefik.http.routers.marzban-http.middlewares=redirect-to-https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+        # HTTPS
+        - "traefik.http.routers.marzban-https.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.marzban-https.entrypoints=websecure"
+        - "traefik.http.routers.marzban-https.tls.certresolver=letsencrypt"
+        - "traefik.http.services.marzban.loadbalancer.server.port=8003"
+    environment:
+      SUDO_USERNAME: ${SUDO_USERNAME:-admin}
+      # Пароль берется из secret
+      SQLALCHEMY_DATABASE_URL: mysql+pymysql://marzban:${MYSQL_PASSWORD}@mysql:3306/marzban-db
+      UVICORN_HOST: "0.0.0.0"
+      UVICORN_PORT: "8003"
+      DOMAIN: ${DOMAIN}
+      DISABLE_INTERNAL_SSL: "true"
+      XRAY_JSON: /var/lib/marzban/xray_config.json
+      XRAY_EXECUTABLE_PATH: /usr/local/bin/xray
+      XRAY_ASSETS_PATH: /usr/local/share/xray
+      WARP_ENABLED: "true"
+      WARP_HOST: warp
+      WARP_PORT: "1080"
+      TELEGRAM_ADMIN_ID: ${TELEGRAM_ADMIN_ID:-}
+      XRAY_SUBSCRIPTION_URL_PREFIX: https://${DOMAIN}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      DOCS: "false"
+      DEBUG: "false"
+      # Reality ключи (опционально)
+      REALITY_PRIVATE_KEY: ${REALITY_PRIVATE_KEY:-}
+      REALITY_PUBLIC_KEY: ${REALITY_PUBLIC_KEY:-}
+      REALITY_DEST: ${REALITY_DEST:-ya.ru:443}
+      REALITY_SERVER_NAMES: ${REALITY_SERVER_NAMES:-ya.ru,www.ya.ru}
+    secrets:
+      - source: marzban_admin_password
+        target: admin_password
+      - source: telegram_token
+        target: telegram_token
+    configs:
+      - source: xray_config
+        target: /app/configs/config.json.template
+    volumes:
+      - marzban_data:/var/lib/marzban
+      - marzban_logs:/var/log/xray
+    ports:
+      # VPN порты - публикуются в режиме host для лучшей производительности
+      - target: 1080
+        published: 1080
+        protocol: tcp
+        mode: host
+      - target: 2053
+        published: 2053
+        protocol: tcp
+        mode: host
+      - target: 2054
+        published: 2054
+        protocol: tcp
+        mode: host
+      - target: 2055
+        published: 2055
+        protocol: tcp
+        mode: host
+      - target: 2083
+        published: 2083
+        protocol: tcp
+        mode: host
+      - target: 2084
+        published: 2084
+        protocol: tcp
+        mode: host
+      - target: 2085
+        published: 2085
+        protocol: tcp
+        mode: host
+      - target: 2443
+        published: 2443
+        protocol: tcp
+        mode: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - mysql
+      - warp
+    networks:
+      - marzban-network
+
+  warp:
+    image: caomingjun/warp
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /lib/modules:/lib/modules:ro
+    healthcheck:
+      test: ["CMD", "curl", "-x", "socks5://127.0.0.1:1080", "-s", "--max-time", "5", "https://cloudflare.com/cdn-cgi/trace"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    networks:
+      - marzban-network
+
+secrets:
+  mysql_password:
+    external: true
+  mysql_root_password:
+    external: true
+  marzban_admin_password:
+    external: true
+  telegram_token:
+    external: true
+
+configs:
+  xray_config:
+    external: true
+
+volumes:
+  mysql_data:
+    driver: local
+  marzban_data:
+    driver: local
+  marzban_logs:
+    driver: local
+
+networks:
+  marzban-network:
+    driver: overlay
+    attachable: true

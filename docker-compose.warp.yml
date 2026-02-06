@@ -13,10 +13,16 @@ services:
     volumes:
       - /lib/modules:/lib/modules:ro
     ports:
-      - "41080:1080"  # SOCKS5 прокси
+      - "41080:1080"  # SOCKS5 прокси (внешний доступ для отладки)
     networks:
-      - warp-net
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "curl", "-x", "socks5://127.0.0.1:1080", "-s", "https://cloudflare.com/cdn-cgi/trace"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 networks:
-  warp-net:
-    driver: bridge
+  dokploy-network:
+    external: true
