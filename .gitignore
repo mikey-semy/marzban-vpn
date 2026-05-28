@@ -3,9 +3,6 @@
 .env.local
 .env.production
 
-# Hysteria2 — реальный конфиг с токеном/паролями (шаблон: hysteria/server.yaml.example)
-hysteria/server.yaml
-
 # Docker volumes
 mysql_data/
 marzban_data/
