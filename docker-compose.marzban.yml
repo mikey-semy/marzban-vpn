@@ -13,8 +13,9 @@ services:
       - marzban_configs:/app/configs
       - marzban_logs:/var/log/xray
     healthcheck:
-      # в Marzban v0.8.4 нет /api/health; GET / отдаёт home-страницу (200, без авторизации)
-      test: ["CMD", "curl", "-fsS", "http://localhost:8003/", "-o", "/dev/null"]
+      # в Marzban v0.8.4 нет /api/health; GET / отдаёт home-страницу (200, без авторизации).
+      # internal SSL включён (self-signed) → проверяем по https с -k
+      test: ["CMD", "curl", "-fsSk", "https://localhost:8003/", "-o", "/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
