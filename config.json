@@ -32,62 +32,6 @@
   },
   "inbounds": [
     {
-      "tag": "VMess TCP",
-      "listen": "0.0.0.0",
-      "port": 2053,
-      "protocol": "vmess",
-      "settings": {
-        "clients": []
-      },
-      "streamSettings": {
-        "network": "tcp"
-      }
-    },
-    {
-      "tag": "VMess WS",
-      "listen": "0.0.0.0",
-      "port": 2083,
-      "protocol": "vmess",
-      "settings": {
-        "clients": []
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-          "path": "/vmess"
-        }
-      }
-    },
-    {
-      "tag": "VLESS TCP",
-      "listen": "0.0.0.0",
-      "port": 2054,
-      "protocol": "vless",
-      "settings": {
-        "clients": [],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "tcp"
-      }
-    },
-    {
-      "tag": "VLESS WS",
-      "listen": "0.0.0.0",
-      "port": 2084,
-      "protocol": "vless",
-      "settings": {
-        "clients": [],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-          "path": "/vless"
-        }
-      }
-    },
-    {
       "tag": "VLESS Reality",
       "listen": "0.0.0.0",
       "port": 2443,
@@ -104,45 +48,36 @@
           "serverNames": ["ya.ru", "www.ya.ru"],
           "privateKey": "KGk81gobUw_93qYY6_cALOKa26VZFL8DCHhtEeb3eEo",
           "publicKey": "RNc4Mz5c3zPvbeLVWTdlSY0t034ZVDg1IN0KMIPTqkA",
-          "shortIds": [""]
+          "shortIds": ["", "6ba8", "5179e30d", "4fc2a1b5e8d0"]
         }
       }
     },
     {
-      "tag": "Trojan TCP",
+      "tag": "VLESS XHTTP Reality",
       "listen": "0.0.0.0",
-      "port": 2055,
-      "protocol": "trojan",
+      "port": 2444,
+      "protocol": "vless",
       "settings": {
-        "clients": []
+        "clients": [],
+        "decryption": "none"
       },
       "streamSettings": {
-        "network": "tcp"
-      }
-    },
-    {
-      "tag": "Trojan WS",
-      "listen": "0.0.0.0",
-      "port": 2085,
-      "protocol": "trojan",
-      "settings": {
-        "clients": []
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-          "path": "/trojan"
+        "network": "xhttp",
+        "security": "reality",
+        "xhttpSettings": {
+          "path": "/api/v1/data",
+          "mode": "auto",
+          "extra": {
+            "xPaddingBytes": "100-1000"
+          }
+        },
+        "realitySettings": {
+          "dest": "ya.ru:443",
+          "serverNames": ["ya.ru", "www.ya.ru"],
+          "privateKey": "KGk81gobUw_93qYY6_cALOKa26VZFL8DCHhtEeb3eEo",
+          "publicKey": "RNc4Mz5c3zPvbeLVWTdlSY0t034ZVDg1IN0KMIPTqkA",
+          "shortIds": ["", "6ba8", "5179e30d", "4fc2a1b5e8d0"]
         }
-      }
-    },
-    {
-      "tag": "Shadowsocks TCP",
-      "listen": "0.0.0.0",
-      "port": 1080,
-      "protocol": "shadowsocks",
-      "settings": {
-        "method": "chacha20-ietf-poly1305",
-        "clients": []
       }
     }
   ],

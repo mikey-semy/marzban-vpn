@@ -8,7 +8,17 @@ RUN apt-get update && apt-get install -y \
     curl \
     jq \
     gosu \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Пин Xray-core поверх базового образа.
+# Базовый gozargah/marzban ставит Xray "latest на момент сборки" и не пинует версию —
+# из-за этого нет гарантии поддержки транспорта xhttp (рейнейм splithttp->xhttp был в Xray ~v24.11.30).
+# Пинуем явную свежую версию: гарантируем xhttp + актуальные правки Reality/XHTTP против DPI.
+# Версию проверяй на https://github.com/XTLS/Xray-core/releases и бампай при необходимости.
+ARG XRAY_VERSION=v26.3.27
+RUN curl -L https://github.com/Gozargah/Marzban-scripts/raw/master/install_latest_xray.sh | bash -s -- ${XRAY_VERSION} \
+    && /usr/local/bin/xray version
 
 # Создание пользователя marzban если не существует
 RUN id -u marzban >/dev/null 2>&1 || useradd -r -s /bin/false marzban

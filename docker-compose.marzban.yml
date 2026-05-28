@@ -1,25 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: marzban-mysql
-    restart: always
-    environment:
-      MYSQL_DATABASE: marzban-db
-      MYSQL_USER: marzban
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    networks:
-      - dokploy-network
-
   marzban:
     build: .
     container_name: marzban
@@ -27,16 +6,10 @@ services:
     env_file: .env
     ports:
       - "8003:8003"    # Панель управления
-      - "1080:1080"    # Shadowsocks
-      - "2053:2053"    # VMess TCP
-      - "2054:2054"    # VLESS TCP
-      - "2055:2055"    # Trojan TCP
-      - "2083:2083"    # VMess WS
-      - "2084:2084"    # VLESS WS
-      - "2085:2085"    # Trojan WS
-      - "2443:2443"    # VLESS Reality
+      - "2443:2443"    # VLESS Reality (TCP)
+      - "2444:2444"    # VLESS Reality (XHTTP)
     volumes:
-      - marzban_data:/var/lib/marzban
+      - marzban_data:/var/lib/marzban     # сюда же ложится SQLite (db.sqlite3)
       - marzban_configs:/app/configs
       - marzban_logs:/var/log/xray
     healthcheck:
@@ -45,14 +18,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    depends_on:
-      mysql:
-        condition: service_healthy
     networks:
       - dokploy-network
 
 volumes:
-  mysql_data:
   marzban_data:
   marzban_configs:
   marzban_logs:

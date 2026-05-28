@@ -241,12 +241,12 @@ update_reality_config() {
         # Конвертируем строку server names в JSON массив
         SERVER_NAMES_JSON=$(echo "$REALITY_SERVER_NAMES" | tr ',' '\n' | jq -R . | jq -s .)
 
-        # Обновляем конфигурацию
+        # Обновляем конфигурацию во ВСЕХ Reality-инбаундах (TCP и XHTTP), а не только в одном по тегу
         jq --arg privKey "$REALITY_PRIVATE_KEY" \
            --arg pubKey "$REALITY_PUBLIC_KEY" \
            --arg dest "$REALITY_DEST" \
            --argjson serverNames "$SERVER_NAMES_JSON" \
-           '.inbounds |= map(if .tag == "VLESS Reality" then
+           '.inbounds |= map(if .streamSettings.security == "reality" then
                .streamSettings.realitySettings.privateKey = $privKey |
                .streamSettings.realitySettings.publicKey = $pubKey |
                .streamSettings.realitySettings.dest = $dest |
@@ -254,7 +254,7 @@ update_reality_config() {
            else . end)' \
            "$xray_config" > "${xray_config}.tmp" && mv "${xray_config}.tmp" "$xray_config"
 
-        log_success "Reality ключи обновлены"
+        log_success "Reality ключи обновлены (во всех reality-инбаундах)"
     else
         log_warning "Reality ключи не заданы, используются значения из шаблона"
         log_warning "Рекомендуется сгенерировать уникальные ключи командой: xray x25519"
