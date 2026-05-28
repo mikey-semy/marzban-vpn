@@ -35,21 +35,19 @@ init_xray_config() {
     # Создание директории если не существует
     mkdir -p "$XRAY_CONFIG_DIR"
 
-    # Копирование шаблона конфигурации если файл не существует
-    if [ ! -f "$XRAY_CONFIG_FILE" ]; then
-        log "Копирование шаблона конфигурации Xray..."
-        cp /app/configs/config.json.template "$XRAY_CONFIG_FILE"
-        log_success "Конфигурация Xray инициализирована: $XRAY_CONFIG_FILE"
-    else
-        log_success "Конфигурация Xray уже существует: $XRAY_CONFIG_FILE"
-    fi
+    # config.json из git — ЕДИНСТВЕННЫЙ источник истины для core-конфига Xray.
+    # Пересеваем шаблон при КАЖДОМ старте, чтобы правки инбаундов из репозитория
+    # применялись на redeploy. Раньше копировали "только если файла нет" → старый
+    # xray_config.json залипал в томе (отсюда и тянулись удалённые легаси-инбаунды).
+    # ВНИМАНИЕ: правки core-конфига через панель Marzban будут перезатёрты — правь config.json в git.
+    # (Пользователи и Hosts/SNI-ротация лежат в БД и НЕ затрагиваются этим пересевом.)
+    log "Пересев конфигурации Xray из git-шаблона..."
+    cp /app/configs/config.json.template "$XRAY_CONFIG_FILE"
+    log_success "Конфигурация Xray засеяна: $XRAY_CONFIG_FILE"
 
     # Проверка валидности JSON
     if ! jq empty "$XRAY_CONFIG_FILE" 2>/dev/null; then
-        log_error "Конфигурация Xray содержит невалидный JSON!"
-        log "Восстановление из шаблона..."
-        cp /app/configs/config.json.template "$XRAY_CONFIG_FILE"
-        log_success "Конфигурация восстановлена из шаблона"
+        log_error "Шаблон Xray содержит невалидный JSON! Проверь config.json в репозитории."
     fi
 }
 
