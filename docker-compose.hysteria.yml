@@ -1,0 +1,22 @@
+services:
+  hysteria:
+    image: ghcr.io/apernet/hysteria:latest
+    container_name: hysteria2
+    restart: always
+    ports:
+      # ВАЖНО: UDP! (мимикрия под HTTP/3/QUIC). Убедись, что 443/udp свободен —
+      # если на сервере Amnezia слушает UDP 443, выбери другой порт (напр. 8443) и тут, и в server.yaml.
+      - "443:443/udp"
+    volumes:
+      - ./hysteria/server.yaml:/etc/hysteria/server.yaml:ro
+      - hysteria_acme:/acme          # кэш Let's Encrypt сертификатов (ACME)
+    command: ["server", "-c", "/etc/hysteria/server.yaml"]
+    networks:
+      - dokploy-network
+
+volumes:
+  hysteria_acme:
+
+networks:
+  dokploy-network:
+    external: true
