@@ -230,6 +230,39 @@ update_warp_config() {
 # Обновление Reality ключей в Xray конфигурации
 update_reality_config() {
     local xray_config="$1"
+    local xray_bin="${XRAY_EXECUTABLE_PATH:-/usr/local/bin/xray}"
+    local reality_keyfile="/var/lib/marzban/reality_keys.env"
+
+    # Источник ключей по приоритету: 1) .env  >  2) ранее сгенерированный файл  >  3) генерация
+    if [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_PUBLIC_KEY" ]; then
+        if [ -f "$reality_keyfile" ]; then
+            log "Reality-ключи не заданы в .env — подхватываю из $reality_keyfile"
+            # shellcheck disable=SC1090
+            . "$reality_keyfile"
+        elif command -v "$xray_bin" >/dev/null 2>&1 || [ -x "$xray_bin" ]; then
+            log_warning "Reality-ключи не заданы — генерирую новую пару (xray x25519)..."
+            local x25519_out priv pub
+            x25519_out=$("$xray_bin" x25519 2>/dev/null)
+            # Формат-агностичный парсинг: старый "Private key:/Public key:" и новый "PrivateKey:/Password:"
+            priv=$(echo "$x25519_out" | grep -iE 'private'          | head -1 | awk '{print $NF}')
+            pub=$(echo  "$x25519_out" | grep -iE 'public|password'  | head -1 | awk '{print $NF}')
+            if [ -n "$priv" ] && [ -n "$pub" ]; then
+                REALITY_PRIVATE_KEY="$priv"
+                REALITY_PUBLIC_KEY="$pub"
+                # Персистим — чтобы ключи были стабильны между рестартами, даже если забыл вписать в .env
+                printf 'REALITY_PRIVATE_KEY=%s\nREALITY_PUBLIC_KEY=%s\n' "$priv" "$pub" > "$reality_keyfile"
+                chmod 600 "$reality_keyfile" 2>/dev/null || true
+                chown marzban:marzban "$reality_keyfile" 2>/dev/null || true
+                log_success "Сгенерирована и сохранена пара Reality-ключей: $reality_keyfile"
+                log_warning "================== СКОПИРУЙ В .env =================="
+                log_warning "REALITY_PRIVATE_KEY=$priv"
+                log_warning "REALITY_PUBLIC_KEY=$pub"
+                log_warning "===================================================="
+            else
+                log_error "Не удалось распарсить вывод 'xray x25519' — ключи не сгенерированы"
+            fi
+        fi
+    fi
 
     # Проверяем наличие Reality переменных
     if [ -n "$REALITY_PRIVATE_KEY" ] && [ -n "$REALITY_PUBLIC_KEY" ]; then
