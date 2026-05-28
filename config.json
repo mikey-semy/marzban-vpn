@@ -5,28 +5,9 @@
   "routing": {
     "rules": [
       {
-        "ip": [
-          "geoip:private"
-        ],
-        "outboundTag": "BLOCK",
-        "type": "field"
-      },
-      {
         "type": "field",
-        "outboundTag": "warp",
-        "domain": [
-            "geosite:openai",
-            "geosite:google",
-            "geosite:youtube",
-            "geosite:netflix",
-            "geosite:instagram",
-            "geosite:facebook",
-            "geosite:twitter",
-            "geosite:discord",
-            "geosite:telegram",
-            "geosite:spotify",
-            "geosite:tiktok"
-        ]
+        "ip": ["geoip:private"],
+        "outboundTag": "BLOCK"
       }
     ]
   },
@@ -44,8 +25,8 @@
         "network": "tcp",
         "security": "reality",
         "realitySettings": {
-          "dest": "ya.ru:443",
-          "serverNames": ["ya.ru", "www.ya.ru"],
+          "dest": "www.microsoft.com:443",
+          "serverNames": ["www.microsoft.com"],
           "privateKey": "KGk81gobUw_93qYY6_cALOKa26VZFL8DCHhtEeb3eEo",
           "publicKey": "RNc4Mz5c3zPvbeLVWTdlSY0t034ZVDg1IN0KMIPTqkA",
           "shortIds": ["", "6ba8", "5179e30d", "4fc2a1b5e8d0"]
@@ -66,14 +47,14 @@
         "security": "reality",
         "xhttpSettings": {
           "path": "/api/v1/data",
-          "mode": "auto",
+          "mode": "stream-up",
           "extra": {
             "xPaddingBytes": "100-1000"
           }
         },
         "realitySettings": {
-          "dest": "ya.ru:443",
-          "serverNames": ["ya.ru", "www.ya.ru"],
+          "dest": "www.microsoft.com:443",
+          "serverNames": ["www.microsoft.com"],
           "privateKey": "KGk81gobUw_93qYY6_cALOKa26VZFL8DCHhtEeb3eEo",
           "publicKey": "RNc4Mz5c3zPvbeLVWTdlSY0t034ZVDg1IN0KMIPTqkA",
           "shortIds": ["", "6ba8", "5179e30d", "4fc2a1b5e8d0"]
@@ -89,18 +70,6 @@
     {
       "protocol": "blackhole",
       "tag": "BLOCK"
-    },
-    {
-      "tag": "warp",
-      "protocol": "socks",
-      "settings": {
-        "servers": [
-          {
-            "address": "warp-proxy",
-            "port": 1080
-          }
-        ]
-      }
     }
   ]
 }

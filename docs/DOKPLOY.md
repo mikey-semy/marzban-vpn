@@ -3,7 +3,7 @@
 ## Подготовка
 
 1. Установленный Dokploy на сервере
-2. Домен с DNS записью, указывающей на сервер
+2. Домен с DNS записью, указывающей на сервер (опционально — панель доступна и по IP)
 3. Форк или клон репозитория
 
 ## Создание проекта
@@ -25,54 +25,65 @@
 SUDO_USERNAME=admin
 SUDO_PASSWORD=ваш_надежный_пароль
 
-# База данных
-SQLALCHEMY_DATABASE_URL=mysql+pymysql://marzban:db_password@mysql:3306/marzban-db
-MYSQL_PASSWORD=db_password
-MYSQL_ROOT_PASSWORD=root_password
+# База данных — SQLite (по умолчанию)
+# SQLALCHEMY_DATABASE_URL НЕ задаём → SQLite в /var/lib/marzban/db.sqlite3
 
 # Сеть
 UVICORN_HOST=0.0.0.0
 UVICORN_PORT=8003
 DOMAIN=vpn.yourdomain.com
 
-# SSL через Traefik
-DISABLE_INTERNAL_SSL=true
+# SSL — ОБЯЗАТЕЛЬНО оставить внутренний self-signed SSL включённым.
+# Без него Marzban v0.8.4 слушает только 127.0.0.1 и недоступен извне/для Traefik.
+DISABLE_INTERNAL_SSL=false
 
-# WARP
-WARP_ENABLED=true
-WARP_HOST=warp-proxy
-WARP_PORT=1080
+# Reality SNI — для exit за границей (глобальный сервис)
+REALITY_DEST=www.microsoft.com:443
+REALITY_SERVER_NAMES=www.microsoft.com
+
+# WARP отключён по умолчанию
+WARP_ENABLED=false
 
 # Подписки
 XRAY_SUBSCRIPTION_URL_PREFIX=https://vpn.yourdomain.com
 ```
 
-### 3. Настройка домена
+> Reality-ключи можно не задавать — `docker-entrypoint.sh` сгенерирует их при первом
+> старте и выведет в логи. После первого деплоя скопируйте `REALITY_PRIVATE_KEY` и
+> `REALITY_PUBLIC_KEY` из логов в Environment, чтобы они пережили пересоздание тома.
+
+### 3. Публикуемые порты
+
+`docker-compose.marzban.yml` публикует только:
+
+| Порт | Назначение |
+|------|------------|
+| 8003 | Панель управления (HTTPS, self-signed) |
+| 2443 | VLESS Reality (TCP) |
+| 2444 | VLESS XHTTP Reality |
+
+### 4. Настройка домена (опционально)
 
 1. Перейдите в **Domains**
 2. Добавьте домен: `vpn.yourdomain.com`
-3. Включите **Generate SSL Certificate**
-4. Выберите **Let's Encrypt**
-
-### 4. Запуск WARP
-
-WARP нужно запустить отдельно на сервере:
-
-```bash
-cd /path/to/marzban-vpn
-docker-compose -f docker-compose.warp.yml up -d
-```
+3. В качестве внутреннего порта приложения укажите **8003**, протокол — **HTTPS**
+   (Marzban отдаёт self-signed HTTPS; Traefik терминирует валидный сертификат снаружи).
+4. Включите **Generate SSL Certificate** → **Let's Encrypt**
 
 ### 5. Развертывание
 
 Нажмите **Deploy** в панели Dokploy.
+
+## Доступ к панели
+
+- Напрямую по IP: `https://<server-ip>:8003/dashboard/` (примите предупреждение о self-signed сертификате)
+- Через домен/Traefik: `https://vpn.yourdomain.com/dashboard/`
 
 ## Мониторинг
 
 ### Логи в Dokploy
 
 - **Marzban**: Projects → marzban-vpn → Logs
-- **MySQL**: Projects → marzban-vpn → Logs (выберите сервис mysql)
 
 ### Метрики
 
@@ -99,11 +110,13 @@ docker-compose -f docker-compose.warp.yml up -d
 
 ```bash
 # Проверка логов
-docker logs marzban-vpn-marzban-1
-
-# Проверка базы данных
-docker exec marzban-vpn-mysql-1 mysqladmin ping -h localhost
+docker logs marzban
 ```
+
+### Панель недоступна извне
+
+Убедитесь, что `DISABLE_INTERNAL_SSL=false` — без внутреннего SSL Marzban v0.8.4
+биндится только на `127.0.0.1`. Подробнее: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ### Ошибки SSL
 
@@ -111,35 +124,23 @@ docker exec marzban-vpn-mysql-1 mysqladmin ping -h localhost
 2. Убедитесь что порты 80/443 открыты
 3. Перегенерируйте сертификат в Dokploy
 
-### WARP недоступен
-
-1. Проверьте что WARP контейнер запущен
-2. Убедитесь что оба контейнера в сети `dokploy-network`
-
 ## Архитектура в Dokploy
 
 ```
 ┌─────────────────────────────────────────────┐
-│                  Dokploy                    │
-│  ┌─────────────────────────────────────┐   │
-│  │              Traefik                │   │
-│  │           (SSL, Routing)            │   │
-│  └─────────────────────────────────────┘   │
-│                    │                        │
-│  ┌─────────────────┼─────────────────┐     │
-│  │                 │                 │     │
-│  │  ┌──────────┐   │   ┌──────────┐  │     │
-│  │  │ Marzban  │◄──┼──►│  MySQL   │  │     │
-│  │  │ (Panel)  │   │   │  (DB)    │  │     │
-│  │  └──────────┘   │   └──────────┘  │     │
-│  │        │        │                 │     │
-│  │        ▼        │                 │     │
-│  │  ┌──────────┐   │                 │     │
-│  │  │   WARP   │   │                 │     │
-│  │  │ (Proxy)  │   │                 │     │
-│  │  └──────────┘   │                 │     │
-│  │                 │                 │     │
-│  │     dokploy-network               │     │
-│  └───────────────────────────────────┘     │
-└─────────────────────────────────────────────┘
+│                  Dokploy                     │
+│  ┌─────────────────────────────────────┐    │
+│  │              Traefik                 │    │
+│  │           (SSL, Routing)             │    │
+│  └─────────────────────────────────────┘    │
+│                    │                         │
+│                    ▼                         │
+│  ┌──────────────────────────────────────┐   │
+│  │              Marzban                  │   │
+│  │   (Panel + Xray, SQLite, self-SSL)   │   │
+│  │   порты 8003 / 2443 / 2444           │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+│              dokploy-network                 │
+└──────────────────────────────────────────────┘
 ```

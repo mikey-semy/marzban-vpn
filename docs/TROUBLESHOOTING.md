@@ -7,8 +7,6 @@
 ```bash
 docker ps -a
 docker logs marzban -f
-docker logs warp-proxy -f
-docker logs mysql -f
 ```
 
 ### Проверка сети
@@ -17,176 +15,144 @@ docker logs mysql -f
 # Проверка DNS
 dig vpn.yourdomain.com
 
-# Проверка портов
-netstat -tlnp | grep -E ':(2053|2054|2055|2083|2084|2085|2443|1080|8003)'
+# Проверка портов (публикуются только эти три)
+netstat -tlnp | grep -E ':(2443|2444|8003)'
 
-# Проверка подключения к MySQL
-docker exec mysql mysqladmin ping -h localhost
+# Проверка панели (внутренний self-signed SSL → флаг -k)
+curl -fsSk https://localhost:8003/ -o /dev/null && echo OK
 ```
 
 ## Частые проблемы
 
-### Marzban не запускается
+### Панель недоступна извне (Marzban слушает только 127.0.0.1)
 
-**Симптомы:** Контейнер перезапускается или не отвечает
+**Симптомы:** Панель открывается с самого сервера, но недоступна по внешнему IP
+или через Traefik в отдельном контейнере.
 
-**Решение:**
-1. Проверьте логи:
-   ```bash
-   docker logs marzban
-   ```
+**Причина:** Marzban v0.8.4 без SSL-сертификата отказывается отдавать голый HTTP на
+`0.0.0.0` и биндится ТОЛЬКО на `127.0.0.1`.
 
-2. Проверьте подключение к БД:
-   ```bash
-   docker exec mysql mysql -u marzban -p -e "SELECT 1"
-   ```
+**Решение:** Оставьте внутренний self-signed SSL включённым:
+```env
+DISABLE_INTERNAL_SSL=false
+```
+Тогда Marzban слушает `https://0.0.0.0:8003`. Панель: `https://<server-ip>:8003/dashboard/`
+(примите предупреждение о сертификате). `DISABLE_INTERNAL_SSL=true` оправдан только если
+reverse-proxy в том же network namespace (host networking) и сам терминирует TLS — для
+Dokploy это НЕ так.
 
-3. Проверьте переменные окружения:
-   ```bash
-   docker exec marzban env | grep -E '(UVICORN|MYSQL|SQL)'
-   ```
+### Ошибка "readonly database" / "attempt to write a readonly database"
 
-### Ошибка подключения к базе данных
+**Симптомы:** Marzban падает при записи в SQLite, БД доступна только на чтение или
+данные теряются после перезапуска.
 
-**Симптомы:** `Connection refused` или `Access denied`
+**Причина:** Файл SQLite оказался не в персистентном томе (например в `/code`), либо у
+процесса нет прав на запись в каталог.
 
-**Решение:**
-1. Убедитесь что MySQL запущен и здоров:
-   ```bash
-   docker ps | grep mysql
-   ```
+**Решение:** Файл БД должен лежать в томе `marzban_data` по пути
+`/var/lib/marzban/db.sqlite3` (это поведение по умолчанию — НЕ задавайте
+`SQLALCHEMY_DATABASE_URL`). Проверьте:
+```bash
+docker exec marzban ls -l /var/lib/marzban/db.sqlite3
+docker volume ls | grep marzban_data
+```
 
-2. Проверьте пароли в `.env` и `SQLALCHEMY_DATABASE_URL`
+### Конфигурация Xray не обновляется
 
-3. Проверьте что контейнеры в одной сети:
-   ```bash
-   docker network inspect dokploy-network
-   ```
+**Симптомы:** Правки в работающем `xray_config.json` внутри контейнера не применяются
+или теряются после рестарта.
 
-### WARP не работает
+**Причина:** `docker-entrypoint.sh` при КАЖДОМ старте пересоздаёт
+`/var/lib/marzban/xray_config.json` из шаблона `config.json` (git-репозиторий = источник истины).
 
-**Симптомы:** Сервисы (ChatGPT, YouTube) не доступны через VPN
+**Решение:** Вносите изменения в `config.json` в репозитории, затем пересоберите/передеплойте:
+```bash
+docker compose -f docker-compose.marzban.yml up -d --build
+```
+Правки прямо в работающем файле будут затёрты при следующем старте.
 
-**Решение:**
-1. Проверьте что WARP запущен:
-   ```bash
-   docker ps | grep warp
-   ```
+### Reality-ключи
 
-2. Проверьте подключение WARP:
-   ```bash
-   docker exec warp-proxy curl -s ipinfo.io
-   docker exec warp-proxy curl -x socks5://127.0.0.1:1080 -s ipinfo.io
-   ```
+**Симптомы:** Клиенты не подключаются после пересоздания тома; ключи "слетели".
 
-3. Проверьте что WARP и Marzban в одной сети:
-   ```bash
-   docker network inspect dokploy-network | grep -A5 warp
-   docker network inspect dokploy-network | grep -A5 marzban
-   ```
+**Причина:** Если `REALITY_PRIVATE_KEY`/`REALITY_PUBLIC_KEY` не заданы в `.env`,
+`docker-entrypoint.sh` генерирует новую пару при первом старте на пустом томе.
 
-4. Перезапустите WARP:
-   ```bash
-   docker restart warp-proxy
-   ```
+**Решение:** После первого старта возьмите ключи из логов или из
+`/var/lib/marzban/reality_keys.env` и пропишите их в `.env`:
+```bash
+docker logs marzban | grep -i reality
+docker exec marzban cat /var/lib/marzban/reality_keys.env
+```
+НЕ используйте кнопку генерации ключей в панели v0.8.4 — она ждёт старый формат `x25519`,
+несовместимый с Xray v26.
 
-### SSL ошибки
+### Healthcheck / эндпоинт здоровья возвращает 404
 
-**Симптомы:** Браузер показывает ошибку сертификата
+**Симптомы:** Запрос к `/api/health` отдаёт 404; healthcheck "unhealthy".
 
-**Решение:**
-1. Проверьте DNS запись:
-   ```bash
-   dig vpn.yourdomain.com
-   ```
+**Причина:** В Marzban v0.8.4 эндпоинта `/api/health` НЕТ.
 
-2. Проверьте настройки SSL в `.env`:
-   ```env
-   # Для Traefik/Cloudflare
-   DISABLE_INTERNAL_SSL=true
+**Решение:** Используйте `GET /` — отдаёт home-страницу (200, без авторизации). С учётом
+внутреннего self-signed SSL проверяйте по HTTPS с флагом `-k`:
+```bash
+curl -fsSk https://localhost:8003/ -o /dev/null && echo OK
+```
 
-   # Для самоподписанных
-   DISABLE_INTERNAL_SSL=false
-   ```
+### Клиент не подключается через XHTTP
 
-3. Проверьте логи Traefik (если используется)
+**Симптомы:** VLESS Reality (TCP, 2443) работает, а XHTTP (2444) — нет.
+
+**Причина:** Клиент не поддерживает транспорт XHTTP.
+
+**Решение:** XHTTP понимают только свежие клиенты: **Hiddify**, **NekoBox**,
+**v2rayNG** (актуальные версии). **Amnezia XHTTP не поддерживает** — для Amnezia
+используйте инбаунд VLESS Reality (TCP, порт 2443).
 
 ### Порты не доступны
 
-**Симптомы:** Не удается подключиться к VPN
+**Симптомы:** Не удается подключиться к VPN.
 
 **Решение:**
 1. Проверьте что порты опубликованы:
    ```bash
    docker port marzban
    ```
-
-2. Проверьте firewall:
+2. Проверьте firewall и откройте нужные порты (публикуются только 8003/2443/2444):
    ```bash
-   # UFW
    ufw status
-
-   # iptables
-   iptables -L -n | grep -E '(2053|2054|2055|2083|2084|2085|2443|1080)'
-   ```
-
-3. Откройте необходимые порты:
-   ```bash
-   ufw allow 2053:2055/tcp
-   ufw allow 2083:2085/tcp
+   ufw allow 8003/tcp
    ufw allow 2443/tcp
-   ufw allow 1080/tcp
+   ufw allow 2444/tcp
    ```
-
-### Конфигурация Xray сбрасывается
-
-**Симптомы:** Настройки теряются после перезапуска
-
-**Решение:**
-1. Проверьте что том `marzban_configs` существует:
-   ```bash
-   docker volume ls | grep marzban
-   ```
-
-2. Проверьте что конфигурация сохраняется:
-   ```bash
-   docker exec marzban cat /var/lib/marzban/xray_config.json
-   ```
-
-### Ошибка "user marzban not found"
-
-**Симптомы:** Контейнер не запускается с ошибкой пользователя
-
-**Решение:**
-Эта проблема исправлена в текущей версии Dockerfile. Обновите образ:
-```bash
-docker-compose -f docker-compose.marzban.yml build --no-cache
-docker-compose -f docker-compose.marzban.yml up -d
-```
 
 ## Сброс и восстановление
 
 ### Полный сброс
 
 ```bash
-# Остановка контейнеров
-docker-compose -f docker-compose.marzban.yml down
-docker-compose -f docker-compose.warp.yml down
+# Остановка контейнера
+docker compose -f docker-compose.marzban.yml down
 
-# Удаление томов (ВНИМАНИЕ: удалит все данные!)
-docker volume rm marzban_data marzban_configs marzban_logs mysql_data
+# Удаление томов (ВНИМАНИЕ: удалит все данные, включая SQLite и Reality-ключи!)
+docker volume rm marzban_data marzban_configs marzban_logs
 
 # Перезапуск
-docker-compose -f docker-compose.warp.yml up -d
-docker-compose -f docker-compose.marzban.yml up -d
+docker compose -f docker-compose.marzban.yml up -d --build
 ```
 
 ### Восстановление конфигурации Xray
 
 ```bash
-# Конфигурация автоматически восстановится из шаблона
-docker exec marzban rm /var/lib/marzban/xray_config.json
+# Конфигурация автоматически пересоздаётся из шаблона config.json при старте
 docker restart marzban
+```
+
+### Бэкап SQLite
+
+```bash
+# БД — один файл, бэкап = его копия
+docker cp marzban:/var/lib/marzban/db.sqlite3 ./db.sqlite3.bak
 ```
 
 ## Логи
@@ -194,8 +160,6 @@ docker restart marzban
 ### Расположение логов
 
 - Marzban: `docker logs marzban`
-- MySQL: `docker logs mysql`
-- WARP: `docker logs warp-proxy`
 - Xray: внутри контейнера `/var/log/xray/`
 
 ### Просмотр логов Xray

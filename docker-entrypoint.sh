@@ -281,8 +281,9 @@ update_reality_config() {
     if [ -n "$REALITY_PRIVATE_KEY" ] && [ -n "$REALITY_PUBLIC_KEY" ]; then
         log "Обновление Reality ключей..."
 
-        REALITY_DEST="${REALITY_DEST:-ya.ru:443}"
-        REALITY_SERVER_NAMES="${REALITY_SERVER_NAMES:-ya.ru,www.ya.ru}"
+        # Дефолт под EXIT за границей (глобальный SNI). Для bridge в РФ задай в .env ya.ru.
+        REALITY_DEST="${REALITY_DEST:-www.microsoft.com:443}"
+        REALITY_SERVER_NAMES="${REALITY_SERVER_NAMES:-www.microsoft.com}"
 
         # Конвертируем строку server names в JSON массив
         SERVER_NAMES_JSON=$(echo "$REALITY_SERVER_NAMES" | tr ',' '\n' | jq -R . | jq -s .)
