@@ -49,7 +49,9 @@ walt.ns.cloudflare.com
 
 В `.env`:
 ```env
-DISABLE_INTERNAL_SSL=true
+# Внутренний SSL оставляем включённым: Marzban v0.8.4 без SSL слушает только 127.0.0.1.
+# На стороне Cloudflare используйте режим Full (strict).
+DISABLE_INTERNAL_SSL=false
 DOMAIN=vpn.yourdomain.com
 XRAY_SUBSCRIPTION_URL_PREFIX=https://vpn.yourdomain.com
 ```
@@ -128,7 +130,8 @@ dig vpn.yourdomain.com
      ▼
 ┌─────────────────┐
 │   Ваш сервер    │
-│   (HTTP)        │
+│ (HTTPS self-    │
+│  signed, 8003)  │
 └─────────────────┘
 ```
 
@@ -137,6 +140,6 @@ dig vpn.yourdomain.com
 Если уже настроен SSL через Traefik/Dokploy:
 
 1. В Dokploy отключите SSL для домена
-2. Настройте Cloudflare
-3. Установите `DISABLE_INTERNAL_SSL=true`
+2. Настройте Cloudflare (режим Full strict)
+3. Оставьте `DISABLE_INTERNAL_SSL=false` (внутренний self-signed SSL обязателен)
 4. Перезапустите проект
