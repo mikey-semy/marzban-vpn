@@ -131,6 +131,13 @@ check_database() {
 
     # Ожидание доступности базы данных
     if [ -n "$SQLALCHEMY_DATABASE_URL" ]; then
+        # SQLite — локальный файл, сетевую БД ждать не нужно
+        case "$SQLALCHEMY_DATABASE_URL" in
+            sqlite*)
+                log_success "Используется SQLite: $SQLALCHEMY_DATABASE_URL"
+                return 0
+                ;;
+        esac
         # Парсинг URL базы данных для получения хоста и порта
         # Поддерживает форматы: mysql+pymysql://user:pass@host:port/db
         DB_HOST=$(echo "$SQLALCHEMY_DATABASE_URL" | sed -E 's/.*@([^:\/]+)(:[0-9]+)?.*/\1/')
@@ -182,6 +189,14 @@ setup_defaults() {
     export XRAY_JSON="${XRAY_JSON:-/var/lib/marzban/xray_config.json}"
     export XRAY_EXECUTABLE_PATH="${XRAY_EXECUTABLE_PATH:-/usr/local/bin/xray}"
     export XRAY_ASSETS_PATH="${XRAY_ASSETS_PATH:-/usr/local/share/xray}"
+
+    # SQLite по умолчанию кладём в персистентный том /var/lib/marzban, а НЕ в /code:
+    #  - /code принадлежит root → под пользователем marzban запись падает с "readonly database"
+    #  - /code это слой образа (не volume) → база терялась бы при каждой пересборке
+    # (если SQLALCHEMY_DATABASE_URL задан в .env — уважаем его, напр. внешний MySQL)
+    if [ -z "$SQLALCHEMY_DATABASE_URL" ]; then
+        export SQLALCHEMY_DATABASE_URL="sqlite:////var/lib/marzban/db.sqlite3"
+    fi
 
     # Настройка SSL в зависимости от режима
     if [ "${DISABLE_INTERNAL_SSL:-false}" = "true" ]; then
