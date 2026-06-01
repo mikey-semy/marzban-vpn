@@ -10,7 +10,9 @@ services:
       - "2444:2444"    # VLESS Reality (XHTTP)
     volumes:
       - marzban_data:/var/lib/marzban     # сюда же ложится SQLite (db.sqlite3)
-      - marzban_configs:/app/configs
+      # ВАЖНО: /app/configs НЕ монтируем в том. Шаблон config.json.template должен
+      # приходить из образа при КАЖДОЙ сборке. Named-volume заполняется из образа
+      # только пока он пуст → старый шаблон "залипал" и затирал XHTTP-инбаунд на redeploy.
       - marzban_logs:/var/log/xray
     healthcheck:
       # в Marzban v0.8.4 нет /api/health; GET / отдаёт home-страницу (200, без авторизации).
@@ -25,7 +27,6 @@ services:
 
 volumes:
   marzban_data:
-  marzban_configs:
   marzban_logs:
 
 networks:

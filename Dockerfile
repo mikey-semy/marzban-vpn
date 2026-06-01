@@ -40,8 +40,11 @@ COPY config.json /app/configs/config.json.template
 RUN chown marzban:marzban /app/configs/config.json.template
 
 EXPOSE 8003
-# Настройка томов для персистентного хранения
-VOLUME ["/var/lib/marzban", "/app/configs", "/var/log/xray"]
+# Настройка томов для персистентного хранения.
+# /app/configs НАМЕРЕННО не том: шаблон config.json.template должен обновляться из
+# образа при каждой сборке. Если сделать его томом — named-volume заполнится из образа
+# лишь однажды (пока пуст), и старый шаблон будет затирать новые инбаунды (XHTTP) на redeploy.
+VOLUME ["/var/lib/marzban", "/var/log/xray"]
 
 # Использование кастомного entrypoint (остаемся под root для инициализации)
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
