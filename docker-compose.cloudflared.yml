@@ -1,0 +1,24 @@
+# Cloudflare Tunnel (cloudflared) — отдельный стек.
+#
+# Зачем: дать клиентам путь через CF edge на стандартном порту 443/tcp,
+# который операторы (МТС и подобные) не блокируют. Cloudflared делает
+# ИСХОДЯЩЕЕ соединение к Cloudflare, ему не нужны открытые порты на origin'е.
+# CF принимает запросы клиентов на cf.sethub.org:443, гонит их через туннель
+# в этот контейнер, тот форвардит в Marzban через docker-сеть (dokploy-network).
+#
+# Полная инструкция: docs/CLOUDFLARE_TUNNEL.md
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: always
+    # Запускаем туннель по токену из Zero Trust dashboard.
+    # Все настройки (какой hostname → какой service) живут в CF UI, не в локальном конфиге.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
