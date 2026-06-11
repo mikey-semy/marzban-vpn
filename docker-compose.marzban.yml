@@ -8,6 +8,7 @@ services:
       - "8003:8003"    # Панель управления
       - "2443:2443"    # VLESS Reality (TCP)
       - "2444:2444"    # VLESS Reality (XHTTP)
+      - "8443:8443"    # VLESS XHTTP за Cloudflare (orange cloud, Origin Cert)
     volumes:
       - marzban_data:/var/lib/marzban     # сюда же ложится SQLite (db.sqlite3)
       # ВАЖНО: /app/configs НЕ монтируем в том. Шаблон config.json.template должен

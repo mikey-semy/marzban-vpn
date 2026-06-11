@@ -240,6 +240,35 @@ update_warp_config() {
     fi
 }
 
+# Настройка CF-fronting инбаунда — убирает его из конфига если Origin Cert не загружен.
+# Это позволяет конфигу содержать инбаунд по умолчанию, но не падать на старте Xray,
+# если пользователь ещё не загрузил сертификат от Cloudflare.
+# См. docs/CLOUDFLARE_FRONTING.md как получить и загрузить Origin Certificate.
+configure_cf_fronting() {
+    local xray_config="$1"
+    local cert_dir="/var/lib/marzban/certs"
+    local cert_file="$cert_dir/cf-origin.crt"
+    local key_file="$cert_dir/cf-origin.key"
+
+    mkdir -p "$cert_dir"
+    chown -R marzban:marzban "$cert_dir" 2>/dev/null || true
+
+    if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
+        log_success "CF-fronting сертификат найден: $cert_file"
+        # Корректируем права на файлах — иначе marzban не сможет их прочитать
+        chmod 644 "$cert_file" 2>/dev/null || true
+        chmod 600 "$key_file" 2>/dev/null || true
+        chown marzban:marzban "$cert_file" "$key_file" 2>/dev/null || true
+    else
+        log_warning "CF-fronting сертификат не найден ($cert_file)"
+        log_warning "Убираю инбаунд 'VLESS XHTTP CF' из конфига чтобы Xray не падал на старте"
+        log_warning "Активировать CF-fronting: положи Cloudflare Origin Cert в $cert_dir (см. docs/CLOUDFLARE_FRONTING.md)"
+
+        jq '.inbounds |= map(select(.tag != "VLESS XHTTP CF"))' \
+           "$xray_config" > "${xray_config}.tmp" && mv "${xray_config}.tmp" "$xray_config"
+    fi
+}
+
 # Обновление Reality ключей в Xray конфигурации
 update_reality_config() {
     local xray_config="$1"
@@ -349,6 +378,7 @@ log "=== Запуск Marzban VPN с персистентной конфигур
     init_xray_config
     update_warp_config "$XRAY_JSON"
     update_reality_config "$XRAY_JSON"
+    configure_cf_fronting "$XRAY_JSON"
     check_database
     run_database_migrations
     switch_to_marzban
