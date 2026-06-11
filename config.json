@@ -60,6 +60,37 @@
           "shortIds": ["", "6ba8", "5179e30d", "4fc2a1b5e8d0"]
         }
       }
+    },
+    {
+      "tag": "VLESS XHTTP CF",
+      "listen": "0.0.0.0",
+      "port": 8443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "cf.sethub.org",
+          "alpn": ["h2", "http/1.1"],
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/cf-origin.crt",
+              "keyFile": "/var/lib/marzban/certs/cf-origin.key"
+            }
+          ]
+        },
+        "xhttpSettings": {
+          "path": "/api/v2/cf",
+          "mode": "packet-up",
+          "extra": {
+            "xPaddingBytes": "100-1000"
+          }
+        }
+      }
     }
   ],
   "outbounds": [
